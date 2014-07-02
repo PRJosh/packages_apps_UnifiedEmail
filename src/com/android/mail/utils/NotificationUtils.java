@@ -28,10 +28,10 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.MailTo;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.Looper;
 import android.provider.ContactsContract;
 import android.provider.ContactsContract.CommonDataKinds.Email;
-import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.NotificationManagerCompat;
 import android.support.v4.text.BidiFormatter;
 import android.support.v4.util.ArrayMap;
@@ -91,6 +91,11 @@ public class NotificationUtils {
     public static final String EXTRA_UNREAD_COUNT = "unread-count";
     public static final String EXTRA_UNSEEN_COUNT = "unseen-count";
     public static final String EXTRA_GET_ATTENTION = "get-attention";
+
+    // Heads up extra flags which are not accessable here.
+    // We use here same flags which are hidden in API21 base. See #android.app.Notification.
+    private static final String EXTRA_AS_HEADS_UP = "headsup";
+    private static final int HEADS_UP_REQUESTED = 2;
 
     /** Contains a list of <(account, label), unread conversations> */
     private static NotificationMap sActiveNotificationMap = null;
@@ -621,9 +626,9 @@ public class NotificationUtils {
             // We now have all we need to create the notification and the pending intent
             PendingIntent clickIntent = null;
 
-            NotificationCompat.Builder notification = new NotificationCompat.Builder(context);
-            NotificationCompat.WearableExtender wearableExtender =
-                    new NotificationCompat.WearableExtender();
+            Notification.Builder notification = new Notification.Builder(context);
+            Notification.WearableExtender wearableExtender =
+                    new Notification.WearableExtender();
             Map<Integer, NotificationBuilders> msgNotifications =
                     new ArrayMap<Integer, NotificationBuilders>();
 
@@ -638,8 +643,8 @@ public class NotificationUtils {
                 notification.setSmallIcon(R.drawable.ic_notification_mail_24dp);
             }
             notification.setTicker(account.getDisplayName());
-            notification.setVisibility(NotificationCompat.VISIBILITY_PRIVATE);
-            notification.setCategory(NotificationCompat.CATEGORY_EMAIL);
+            notification.setVisibility(Notification.VISIBILITY_PRIVATE);
+            notification.setCategory(Notification.CATEGORY_EMAIL);
 
             final long when;
 
@@ -740,6 +745,13 @@ public class NotificationUtils {
             LogUtils.i(LOG_TAG, "Account: %s vibrate: %s",
                     LogUtils.sanitizeName(LOG_TAG, account.getEmailAddress()),
                     Boolean.toString(folderPreferences.isNotificationVibrateEnabled()));
+
+            if (folderPreferences.isNotificationHeadsUpEnabled()) {
+                Bundle extras = new Bundle();
+                // Request a heads up notification if possible
+                extras.putInt(EXTRA_AS_HEADS_UP, HEADS_UP_REQUESTED);
+                notification.setExtras(extras);
+            }
 
             int defaults = 0;
 
@@ -853,13 +865,13 @@ public class NotificationUtils {
             Folder folder, long when, int unseenCount, int unreadCount, PendingIntent clickIntent) {
         final boolean multipleUnseen = unseenCount > 1;
 
-        final NotificationCompat.Builder builder = new NotificationCompat.Builder(context)
+        final Notification.Builder builder = new Notification.Builder(context)
                 .setContentTitle(createTitle(context, unseenCount))
                 .setContentText(account.getDisplayName())
                 .setContentIntent(clickIntent)
                 .setNumber(unreadCount)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setCategory(NotificationCompat.CATEGORY_EMAIL)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .setCategory(Notification.CATEGORY_EMAIL)
                 .setWhen(when);
 
         if (com.android.mail.utils.Utils.isRunningLOrLater()) {
@@ -964,8 +976,8 @@ public class NotificationUtils {
 
     private static void configureLatestEventInfoFromConversation(final Context context,
             final Account account, final FolderPreferences folderPreferences,
-            final NotificationCompat.Builder notificationBuilder,
-            final NotificationCompat.WearableExtender wearableExtender,
+            final Notification.Builder notificationBuilder,
+            final Notification.WearableExtender wearableExtender,
             final Map<Integer, NotificationBuilders> msgNotifications,
             final int summaryNotificationId, final Cursor conversationCursor,
             final PendingIntent clickIntent, final Intent notificationIntent,
@@ -1005,8 +1017,8 @@ public class NotificationUtils {
                 notificationBuilder.setSubText(
                         isInbox ? account.getDisplayName() : notificationLabelName);
 
-                final NotificationCompat.InboxStyle digest =
-                        new NotificationCompat.InboxStyle(notificationBuilder);
+                final Notification.InboxStyle digest =
+                        new Notification.InboxStyle(notificationBuilder);
 
                 // Group by account and folder
                 final String notificationGroupKey = createGroupKey(account, folder);
@@ -1071,9 +1083,9 @@ public class NotificationUtils {
                             numDigestItems++;
 
                             // Adding conversation notification for Wear.
-                            NotificationCompat.Builder conversationNotif =
-                                    new NotificationCompat.Builder(context);
-                            conversationNotif.setCategory(NotificationCompat.CATEGORY_EMAIL);
+                            Notification.Builder conversationNotif =
+                                    new Notification.Builder(context);
+                            conversationNotif.setCategory(Notification.CATEGORY_EMAIL);
 
                             conversationNotif.setSmallIcon(
                                     R.drawable.ic_notification_multiple_mail_24dp);
@@ -1103,8 +1115,8 @@ public class NotificationUtils {
                             int conversationNotificationId = getNotificationId(
                                     summaryNotificationId, conversation.hashCode());
 
-                            final NotificationCompat.WearableExtender conversationWearExtender =
-                                    new NotificationCompat.WearableExtender();
+                            final Notification.WearableExtender conversationWearExtender =
+                                    new Notification.WearableExtender();
                             final ConfigResult result =
                                     configureNotifForOneConversation(context, account,
                                     folderPreferences, conversationNotif, conversationWearExtender,
@@ -1189,8 +1201,8 @@ public class NotificationUtils {
      */
     private static ConfigResult configureNotifForOneConversation(Context context,
             Account account, FolderPreferences folderPreferences,
-            NotificationCompat.Builder notificationBuilder,
-            NotificationCompat.WearableExtender wearExtender, Cursor conversationCursor,
+            Notification.Builder notificationBuilder,
+            Notification.WearableExtender wearExtender, Cursor conversationCursor,
             Intent notificationIntent, Folder folder, long when, Resources res,
             boolean isInbox, String notificationLabelName, int notificationId,
             final ContactFetcher contactFetcher) {
@@ -1279,8 +1291,8 @@ public class NotificationUtils {
                 notificationBuilder.setSubText(isInbox ?
                         account.getDisplayName() : notificationLabelName);
 
-                final NotificationCompat.BigTextStyle bigText =
-                        new NotificationCompat.BigTextStyle(notificationBuilder);
+                final Notification.BigTextStyle bigText =
+                        new Notification.BigTextStyle(notificationBuilder);
 
                 // Seek the message cursor to the first unread message
                 final Message message;
@@ -1336,7 +1348,7 @@ public class NotificationUtils {
      * @param notificationBuilder
      * @param senderAddressesSet List of unique senders to be tagged with the conversation
      */
-    private static void tagNotificationsWithPeople(NotificationCompat.Builder notificationBuilder,
+    private static void tagNotificationsWithPeople(Notification.Builder notificationBuilder,
             HashSet<String> senderAddressesSet) {
         for (final String sender : senderAddressesSet) {
             if (TextUtils.isEmpty(sender)) {
@@ -1444,7 +1456,7 @@ public class NotificationUtils {
      * @param subject Subject of the new message that triggered the notification
      * @param snippet Snippet of the new message that triggered the notification
      * @return a {@link CharSequence} suitable for use in
-     *         {@link android.support.v4.app.NotificationCompat.BigTextStyle}
+     *         {@link android.app.Notification.BigTextStyle}
      */
     private static CharSequence getSingleMessageInboxLine(Context context,
             String senders, String subject, String snippet) {
@@ -1498,7 +1510,7 @@ public class NotificationUtils {
      * @param context
      * @param subject Subject of the new message that triggered the notification
      * @return a {@link CharSequence} suitable for use in
-     * {@link NotificationCompat.Builder#setContentText}
+     * {@link android.app.Notification.Builder#setContentText}
      */
     private static CharSequence getSingleMessageLittleText(Context context, String subject) {
         final TextAppearanceSpan notificationSubjectSpan = new TextAppearanceSpan(
@@ -1517,7 +1529,7 @@ public class NotificationUtils {
      * @param subject Subject of the new message that triggered the notification
      * @param message the {@link Message} to be displayed.
      * @return a {@link CharSequence} suitable for use in
-     *         {@link android.support.v4.app.NotificationCompat.BigTextStyle}
+     *         {@link android.app.Notification.BigTextStyle}
      */
     private static CharSequence getSingleMessageBigText(Context context, String subject,
             final Message message) {
@@ -2014,17 +2026,17 @@ public class NotificationUtils {
     }
 
     private static class NotificationBuilders {
-        public final NotificationCompat.Builder notifBuilder;
-        public final NotificationCompat.WearableExtender wearableNotifBuilder;
+        public final Notification.Builder notifBuilder;
+        public final Notification.WearableExtender wearableNotifBuilder;
 
-        private NotificationBuilders(NotificationCompat.Builder notifBuilder,
-                NotificationCompat.WearableExtender wearableNotifBuilder) {
+        private NotificationBuilders(Notification.Builder notifBuilder,
+                Notification.WearableExtender wearableNotifBuilder) {
             this.notifBuilder = notifBuilder;
             this.wearableNotifBuilder = wearableNotifBuilder;
         }
 
-        public static NotificationBuilders of(NotificationCompat.Builder notifBuilder,
-                NotificationCompat.WearableExtender wearableNotifBuilder) {
+        public static NotificationBuilders of(Notification.Builder notifBuilder,
+                Notification.WearableExtender wearableNotifBuilder) {
             return new NotificationBuilders(notifBuilder, wearableNotifBuilder);
         }
     }
